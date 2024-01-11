@@ -1,0 +1,52 @@
+From 5b093570dca1855c5bf40bcbd8d149fa6f8ea8ff Mon Sep 17 00:00:00 2001
+Message-Id: <5b093570dca1855c5bf40bcbd8d149fa6f8ea8ff.1650620058.git.davide.caratti@gmail.com>
+From: Lubomir Rintel <lkundrak@v3.sk>
+Date: Mon, 7 Mar 2022 09:54:46 +0100
+Subject: [PATCH] D-Bus: Add 'wep_disabled' capability
+
+Since commit 200c7693c9a1 ('Make WEP functionality an optional build
+parameter'), WEP support is optional and, indeed, off by default.
+
+The distributions are now catching up and disabling WEP in their builds.
+Unfortunately, there's no indication prior to an attempt to connect to a
+WEP network that it's not going to work. Add a capability to communicate
+that.
+
+Unlike other capabilities, this one is negative. That is, it indicates
+lack of a WEP support as opposed to its presence. This is necessary
+because historically there has been no capability to indicate presence
+of WEP support and therefore NetworkManager (and probably others) just
+assumes it's there.
+
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Acked-by: Davide Caratti <davide.caratti@gmail.com>
+---
+ wpa_supplicant/dbus/dbus_new_handlers.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/wpa_supplicant/dbus/dbus_new_handlers.c b/wpa_supplicant/dbus/dbus_new_handlers.c
+index 1c9ded09a..0b1002bf1 100644
+--- a/wpa_supplicant/dbus/dbus_new_handlers.c
++++ b/wpa_supplicant/dbus/dbus_new_handlers.c
+@@ -1121,7 +1121,7 @@ dbus_bool_t wpas_dbus_getter_global_capabilities(
+ 	const struct wpa_dbus_property_desc *property_desc,
+ 	DBusMessageIter *iter, DBusError *error, void *user_data)
+ {
+-	const char *capabilities[13];
++	const char *capabilities[14];
+ 	size_t num_items = 0;
+ 	struct wpa_global *global = user_data;
+ 	struct wpa_supplicant *wpa_s;
+@@ -1177,6 +1177,9 @@ dbus_bool_t wpas_dbus_getter_global_capabilities(
+ #endif /* CONFIG_SUITEB192 */
+ 	if (ext_key_id_supported)
+ 		capabilities[num_items++] = "extended_key_id";
++#ifndef CONFIG_WEP
++	capabilities[num_items++] = "wep_disabled";
++#endif /* !CONFIG_WEP */
+ 
+ 	return wpas_dbus_simple_array_property_getter(iter,
+ 						      DBUS_TYPE_STRING,
+-- 
+2.35.1
+
