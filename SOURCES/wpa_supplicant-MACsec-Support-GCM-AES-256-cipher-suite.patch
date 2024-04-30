@@ -1,0 +1,192 @@
+From 46c635910a724ed14ee9ace549fed9790ed5980b Mon Sep 17 00:00:00 2001
+Message-ID: <46c635910a724ed14ee9ace549fed9790ed5980b.1706279119.git.davide.caratti@gmail.com>
+From: leiwei <quic_leiwei@quicinc.com>
+Date: Mon, 15 Nov 2021 18:22:19 +0800
+Subject: [PATCH] MACsec: Support GCM-AES-256 cipher suite
+
+Allow macsec_csindex to be configured and select the cipher suite when
+the participant acts as a key server.
+
+Signed-off-by: leiwei <quic_leiwei@quicinc.com>
+---
+ hostapd/config_file.c        | 10 ++++++++++
+ hostapd/hostapd.conf         |  4 ++++
+ src/ap/ap_config.h           |  7 +++++++
+ src/ap/wpa_auth_kay.c        |  4 +++-
+ src/pae/ieee802_1x_cp.c      |  8 ++++----
+ src/pae/ieee802_1x_kay.c     | 17 +++++++++++++----
+ src/pae/ieee802_1x_kay.h     |  3 ++-
+ wpa_supplicant/config.c      |  1 +
+ wpa_supplicant/config_file.c |  1 +
+ wpa_supplicant/config_ssid.h |  7 +++++++
+ wpa_supplicant/wpas_kay.c    |  4 ++--
+ 11 files changed, 54 insertions(+), 12 deletions(-)
+
+--- a/src/ap/ap_config.h
++++ b/src/ap/ap_config.h
+@@ -849,6 +849,13 @@ struct hostapd_bss_config {
+ 	int mka_priority;
+ 
+ 	/**
++	 * macsec_csindex - Cipher suite index for MACsec
++	 *
++	 * Range: 0-1 (default: 0)
++	 */
++	int macsec_csindex;
++
++	/**
+ 	 * mka_ckn - MKA pre-shared CKN
+ 	 */
+ #define MACSEC_CKN_MAX_LEN 32
+--- a/src/ap/wpa_auth_kay.c
++++ b/src/ap/wpa_auth_kay.c
+@@ -329,7 +329,9 @@ int ieee802_1x_alloc_kay_sm_hapd(struct
+ 				  hapd->conf->macsec_replay_protect,
+ 				  hapd->conf->macsec_replay_window,
+ 				  hapd->conf->macsec_port,
+-				  hapd->conf->mka_priority, hapd->conf->iface,
++				  hapd->conf->mka_priority,
++				  hapd->conf->macsec_csindex,
++				  hapd->conf->iface,
+ 				  hapd->own_addr);
+ 	/* ieee802_1x_kay_init() frees kay_ctx on failure */
+ 	if (!res)
+--- a/src/pae/ieee802_1x_cp.c
++++ b/src/pae/ieee802_1x_cp.c
+@@ -20,7 +20,7 @@
+ #define STATE_MACHINE_DATA struct ieee802_1x_cp_sm
+ #define STATE_MACHINE_DEBUG_PREFIX "CP"
+ 
+-static u64 default_cs_id = CS_ID_GCM_AES_128;
++static u64 cs_id[] = { CS_ID_GCM_AES_128, CS_ID_GCM_AES_256 };
+ 
+ /* The variable defined in clause 12 in IEEE Std 802.1X-2010 */
+ enum connect_type { PENDING, UNAUTHENTICATED, AUTHENTICATED, SECURE };
+@@ -210,7 +210,6 @@ SM_STATE(CP, SECURED)
+ 	sm->replay_protect = sm->kay->macsec_replay_protect;
+ 	sm->validate_frames = sm->kay->macsec_validate;
+ 
+-	/* NOTE: now no other than default cipher suite (AES-GCM-128) */
+ 	sm->current_cipher_suite = sm->cipher_suite;
+ 	secy_cp_control_current_cipher_suite(sm->kay, sm->current_cipher_suite);
+ 
+@@ -473,8 +472,8 @@ struct ieee802_1x_cp_sm * ieee802_1x_cp_
+ 	sm->orx = false;
+ 	sm->otx = false;
+ 
+-	sm->current_cipher_suite = default_cs_id;
+-	sm->cipher_suite = default_cs_id;
++	sm->current_cipher_suite = cs_id[kay->macsec_csindex];
++	sm->cipher_suite = cs_id[kay->macsec_csindex];
+ 	sm->cipher_offset = CONFIDENTIALITY_OFFSET_0;
+ 	sm->confidentiality_offset = sm->cipher_offset;
+ 	sm->transmit_delay = MKA_LIFE_TIME;
+@@ -491,6 +490,7 @@ struct ieee802_1x_cp_sm * ieee802_1x_cp_
+ 	secy_cp_control_enable_port(sm->kay, sm->controlled_port_enabled);
+ 	secy_cp_control_confidentiality_offset(sm->kay,
+ 					       sm->confidentiality_offset);
++	secy_cp_control_current_cipher_suite(sm->kay, sm->current_cipher_suite);
+ 
+ 	SM_STEP_RUN(CP);
+ 
+--- a/src/pae/ieee802_1x_kay.c
++++ b/src/pae/ieee802_1x_kay.c
+@@ -221,8 +221,16 @@ ieee802_1x_mka_dump_dist_sak_body(struct
+ 
+ 	wpa_printf(MSG_DEBUG, "\tKey Number............: %d",
+ 		   be_to_host32(body->kn));
+-	/* TODO: Other than GCM-AES-128 case: MACsec Cipher Suite */
+-	wpa_hexdump(MSG_DEBUG, "\tAES Key Wrap of SAK...:", body->sak, 24);
++	if (body_len == 28) {
++		wpa_hexdump(MSG_DEBUG, "\tAES Key Wrap of SAK...:",
++			    body->sak, 24);
++	} else if (body_len > CS_ID_LEN - sizeof(body->kn)) {
++		wpa_hexdump(MSG_DEBUG, "\tMACsec Cipher Suite...:",
++			    body->sak, CS_ID_LEN);
++		wpa_hexdump(MSG_DEBUG, "\tAES Key Wrap of SAK...:",
++			    body->sak + CS_ID_LEN,
++			    body_len - CS_ID_LEN - sizeof(body->kn));
++	}
+ }
+ 
+ 
+@@ -3456,7 +3464,8 @@ static void kay_l2_receive(void *ctx, co
+ struct ieee802_1x_kay *
+ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
+ 		    bool macsec_replay_protect, u32 macsec_replay_window,
+-		    u16 port, u8 priority, const char *ifname, const u8 *addr)
++		    u16 port, u8 priority, u32 macsec_csindex,
++		    const char *ifname, const u8 *addr)
+ {
+ 	struct ieee802_1x_kay *kay;
+ 
+@@ -3493,7 +3502,7 @@ ieee802_1x_kay_init(struct ieee802_1x_ka
+ 	kay->dist_time = 0;
+ 
+ 	kay->pn_exhaustion = PENDING_PN_EXHAUSTION;
+-	kay->macsec_csindex = DEFAULT_CS_INDEX;
++	kay->macsec_csindex = macsec_csindex;
+ 	kay->mka_algindex = DEFAULT_MKA_ALG_INDEX;
+ 	kay->mka_version = MKA_VERSION_ID;
+ 
+--- a/src/pae/ieee802_1x_kay.h
++++ b/src/pae/ieee802_1x_kay.h
+@@ -240,7 +240,8 @@ u64 mka_sci_u64(struct ieee802_1x_mka_sc
+ struct ieee802_1x_kay *
+ ieee802_1x_kay_init(struct ieee802_1x_kay_ctx *ctx, enum macsec_policy policy,
+ 		    bool macsec_replay_protect, u32 macsec_replay_window,
+-		    u16 port, u8 priority, const char *ifname, const u8 *addr);
++		    u16 port, u8 priority, u32 macsec_csindex,
++		    const char *ifname, const u8 *addr);
+ void ieee802_1x_kay_deinit(struct ieee802_1x_kay *kay);
+ 
+ struct ieee802_1x_mka_participant *
+--- a/wpa_supplicant/config.c
++++ b/wpa_supplicant/config.c
+@@ -2612,6 +2612,7 @@ static const struct parse_data ssid_fiel
+ 	{ INT(macsec_replay_window) },
+ 	{ INT_RANGE(macsec_port, 1, 65534) },
+ 	{ INT_RANGE(mka_priority, 0, 255) },
++	{ INT_RANGE(macsec_csindex, 0, 1) },
+ 	{ FUNC_KEY(mka_cak) },
+ 	{ FUNC_KEY(mka_ckn) },
+ #endif /* CONFIG_MACSEC */
+--- a/wpa_supplicant/config_file.c
++++ b/wpa_supplicant/config_file.c
+@@ -810,6 +810,7 @@ static void wpa_config_write_network(FIL
+ 	INT(macsec_replay_window);
+ 	INT(macsec_port);
+ 	INT_DEF(mka_priority, DEFAULT_PRIO_NOT_KEY_SERVER);
++	INT(macsec_csindex);
+ #endif /* CONFIG_MACSEC */
+ #ifdef CONFIG_HS20
+ 	INT(update_identifier);
+--- a/wpa_supplicant/config_ssid.h
++++ b/wpa_supplicant/config_ssid.h
+@@ -912,6 +912,13 @@ struct wpa_ssid {
+ 	int mka_priority;
+ 
+ 	/**
++	 * macsec_csindex - Cipher suite index for MACsec
++	 *
++	 * Range: 0-1 (default: 0)
++	 */
++	int macsec_csindex;
++
++	/**
+ 	 * mka_ckn - MKA pre-shared CKN
+ 	 */
+ #define MACSEC_CKN_MAX_LEN 32
+--- a/wpa_supplicant/wpas_kay.c
++++ b/wpa_supplicant/wpas_kay.c
+@@ -241,8 +241,8 @@ int ieee802_1x_alloc_kay_sm(struct wpa_s
+ 
+ 	res = ieee802_1x_kay_init(kay_ctx, policy, ssid->macsec_replay_protect,
+ 				  ssid->macsec_replay_window, ssid->macsec_port,
+-				  ssid->mka_priority, wpa_s->ifname,
+-				  wpa_s->own_addr);
++				  ssid->mka_priority, ssid->macsec_csindex,
++				  wpa_s->ifname, wpa_s->own_addr);
+ 	/* ieee802_1x_kay_init() frees kay_ctx on failure */
+ 	if (res == NULL)
+ 		return -1;
