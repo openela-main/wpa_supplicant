@@ -1,7 +1,6 @@
-diff -up wpa_supplicant-0.7.3/wpa_supplicant/wpa_supplicant.c.assoc-timeout wpa_supplicant-0.7.3/wpa_supplicant/wpa_supplicant.c
---- wpa_supplicant-0.7.3/wpa_supplicant/wpa_supplicant.c.assoc-timeout	2010-09-07 10:43:39.000000000 -0500
-+++ wpa_supplicant-0.7.3/wpa_supplicant/wpa_supplicant.c	2010-12-07 18:57:45.163457000 -0600
-@@ -1262,10 +1262,10 @@ void wpa_supplicant_associate(struct wpa
+--- a/wpa_supplicant/wpa_supplicant.c
++++ b/wpa_supplicant/wpa_supplicant.c
+@@ -4619,10 +4619,10 @@ static void wpas_start_assoc_cb(struct w
  
  		if (assoc_failed) {
  			/* give IBSS a bit more time */

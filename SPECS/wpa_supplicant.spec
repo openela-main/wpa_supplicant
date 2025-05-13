@@ -8,8 +8,8 @@
 Summary: WPA/WPA2/IEEE 802.1X Supplicant
 Name: wpa_supplicant
 Epoch: 1
-Version: 2.10
-Release: 5%{?dist}
+Version: 2.11
+Release: 2%{?dist}
 License: BSD
 Source0: http://w1.fi/releases/%{name}-%{version}.tar.gz
 Source1: wpa_supplicant.conf
@@ -29,19 +29,8 @@ Patch2: wpa_supplicant-flush-debug-output.patch
 Patch3: wpa_supplicant-quiet-scan-results-message.patch
 # distro specific customization for Qt4 build tools, not suitable for upstream
 Patch4: wpa_supplicant-gui-qt4.patch
-# backport fix for bz2063730
-Patch5: 0001-D-Bus-Add-wep_disabled-capability.patch
-# backport fix for bz2077973
-Patch6: 0001-EAP-peer-Workaround-for-servers-that-do-not-support-.patch
-Patch7: 0001-EAP-peer-status-notification-for-server-not-supporti.patch
-# support macsec HW offload
-Patch8: wpa_supplicant-MACsec-Support-GCM-AES-256-cipher-suite.patch
-Patch9: wpa_supplicant-macsec_linux-Support-cipher-suite-configuration.patch
-Patch10: wpa_supplicant-mka-Allow-configuration-of-MACsec-hardware-offload.patch
-Patch11: wpa_supplicant-macsec_linux-Add-support-for-MACsec-hardware-offload.patch
-
-# fix PEAP client to require successful Phase2 authentication when needed (CVE-2023-52160)
-Patch12: wpa_supplicant-PEAP-client-Update-Phase-2-authentication-requiremen.patch
+# backport fix for a regression introduced with upstream version 2.11
+Patch5: wpa_supplicant-Revert-Mark-authorization-completed-on-driver-indica.patch
 
 URL: http://w1.fi/wpa_supplicant/
 
@@ -202,6 +191,13 @@ chmod -R 0644 wpa_supplicant/examples/*.py
 
 
 %changelog
+* Thu Feb 13 2025 Davide Caratti <dcaratti@redhat.com> - 1:2.11-2
+- Enable CONFIG_IEEE80211BE (RHEL-10237)
+
+* Thu Nov 28 2024 Davide Caratti <dcaratti@redhat.com> - 1:2.11-1
+- Update to upstream version 2.11 (plus a follow-up backport)
+  Resolves: RHEL-10237, RHEL-58725
+
 * Thu Feb 22 2024 Davide Caratti <dcaratti@redhat.com> - 1:2.10-5
 - Support macsec HW offload.
   Resolves: RHEL-22440
