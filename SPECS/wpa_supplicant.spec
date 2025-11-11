@@ -9,7 +9,7 @@ Summary: WPA/WPA2/IEEE 802.1X Supplicant
 Name: wpa_supplicant
 Epoch: 1
 Version: 2.11
-Release: 3%{?dist}
+Release: 4%{?dist}
 License: BSD-3-Clause
 Source0: http://w1.fi/releases/%{name}-%{version}.tar.gz
 Source1: wpa_supplicant.conf
@@ -31,6 +31,10 @@ Patch3: wpa_supplicant-quiet-scan-results-message.patch
 Patch4: wpa_supplicant-gui-qt4.patch
 # fix known regression on brcmfmac (rhbz#2302577)
 Patch5: wpa_supplicant-Revert-Mark-authorization-completed-on-driver-indica.patch
+# use pkcs11-provider instead of OpenSSL engine
+Patch6: wpa_supplicant-OpenSSL-Use-pkcs11-provider-when-OPENSSL_NO_ENGINE-i.patch
+# de-clutter syslog from CTRL-EVENT-SIGNAL-CHANGE messages
+Patch7: wpa_supplicant-Send-signal-change-as-debug-msg.patch
 
 URL: http://w1.fi/wpa_supplicant/
 
@@ -48,6 +52,8 @@ Requires(post): systemd-sysv
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
+Requires: pkcs11-provider >= 1.0
+
 # libeap used to be built from wpa_supplicant with some fairly horrible
 # hackery, solely for use by WiMAX. We dropped all WiMAX support around
 # F21. This is here so people don't wind up with obsolete libeap packages
@@ -191,6 +197,10 @@ chmod -R 0644 wpa_supplicant/examples/*.py
 
 
 %changelog
+* Fri Apr 11 2025 Davide Caratti <dcaratti@redhat.com> - 1:2.11-4
+- Use pkcs11 provider to resolve PKCS11 URIs (RHEL-86951)
+- De-clutter syslog from CTRL-EVENT-SIGNAL-CHANGE messages (RHEL-71344)
+
 * Thu Feb 13 2025 Davide Caratti <dcaratti@redhat.com> - 1:2.11-3
 - Enable CONFIG_IEEE80211BE (RHEL-59010)
 
