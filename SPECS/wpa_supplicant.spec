@@ -9,7 +9,7 @@ Summary: WPA/WPA2/IEEE 802.1X Supplicant
 Name: wpa_supplicant
 Epoch: 1
 Version: 2.11
-Release: 4%{?dist}
+Release: 5%{?dist}
 License: BSD-3-Clause
 Source0: http://w1.fi/releases/%{name}-%{version}.tar.gz
 Source1: wpa_supplicant.conf
@@ -197,6 +197,9 @@ chmod -R 0644 wpa_supplicant/examples/*.py
 
 
 %changelog
+* Thu Oct  9 2025 Davide Caratti <dcaratti@redhat.com> - 1:2.11-5
+- Re-enable CONFIG_IEEE80211R (RHEL-107173)
+
 * Fri Apr 11 2025 Davide Caratti <dcaratti@redhat.com> - 1:2.11-4
 - Use pkcs11 provider to resolve PKCS11 URIs (RHEL-86951)
 - De-clutter syslog from CTRL-EVENT-SIGNAL-CHANGE messages (RHEL-71344)

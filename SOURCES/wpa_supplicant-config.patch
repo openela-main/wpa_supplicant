@@ -26,15 +26,6 @@ Subject: [PATCH] defconfig: Fedora configuration
  
  # If CONFIG_TLS=internal is used, additional library and include paths are
  # needed for LibTomMath. Alternatively, an integrated, minimal version of
-@@ -418,7 +419,7 @@ CONFIG_CTRL_IFACE_DBUS_INTRO=y
- #CONFIG_NO_LOAD_DYNAMIC_EAP=y
- 
- # IEEE Std 802.11r-2008 (Fast BSS Transition) for station mode
--CONFIG_IEEE80211R=y
-+#CONFIG_IEEE80211R=y
- 
- # Add support for writing debug log to a file (/tmp/wpa_supplicant-log-#.txt)
- CONFIG_DEBUG_FILE=y
 @@ -497,7 +498,7 @@ CONFIG_DEBUG_SYSLOG=y
  # Should we attempt to use the getrandom(2) call that provides more reliable
  # yet secure randomness source than /dev/random on Linux 3.17 and newer.
